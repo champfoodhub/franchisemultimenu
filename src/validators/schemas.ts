@@ -134,3 +134,41 @@ export const branchMenuUpdateSchema = z.object({
 
 export type BranchMenuUpdateInput = z.infer<typeof branchMenuUpdateSchema>;
 
+/**
+ * Menu item creation validation schema (HQ)
+ */
+export const createMenuItemSchema = z.object({
+  product_id: z.string().uuid('Invalid product ID format'),
+  branch_id: z.string().uuid('Invalid branch ID format').optional(),
+  name: z
+    .string()
+    .min(1, 'Menu item name is required')
+    .min(2, 'Menu item name must be at least 2 characters')
+    .max(100, 'Menu item name must be less than 100 characters'),
+  price: z
+    .number()
+    .positive('Price must be a positive number'),
+  description: z.string().max(500, 'Description must be less than 500 characters').optional(),
+  category: z
+    .string()
+    .min(2, 'Category must be at least 2 characters')
+    .max(50, 'Category must be less than 50 characters')
+    .optional(),
+  image_url: z.string().url('Invalid image URL format').optional(),
+  is_active: z.boolean().default(true),
+});
+
+export type CreateMenuItemInput = z.infer<typeof createMenuItemSchema>;
+
+/**
+ * Schedule query parameters schema
+ */
+export const scheduleQuerySchema = z.object({
+  type: z.enum(['TIME_SLOT', 'SEASONAL']).optional(),
+  is_active: z.boolean().optional(),
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(10),
+});
+
+export type ScheduleQueryInput = z.infer<typeof scheduleQuerySchema>;
+

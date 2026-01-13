@@ -9,6 +9,7 @@ import menuRoutes from './routes/menu.routes';
 import authRoutes from './routes/auth.routes';
 import hqRoutes from './routes/hq.routes';
 import branchRoutes from './routes/branch.routes';
+import scheduleRoutes from './routes/schedule.routes';
 
 const app: Application = express();
 
@@ -16,10 +17,10 @@ const app: Application = express();
 app.use(express.json());
 
 // Routes
-app.use('/api/menu', menuRoutes);
 app.use('/auth', authRoutes);
 app.use('/hq', hqRoutes);
 app.use('/branch', branchRoutes);
+app.use('/hq', scheduleRoutes); // Schedule management under HQ admin
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {

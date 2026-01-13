@@ -1,4 +1,4 @@
-/**
+/*
  * Success response helper
  */
 export const success = (res, data, message = 'Success') => {

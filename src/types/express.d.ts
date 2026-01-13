@@ -8,6 +8,7 @@ declare global {
         branch_id?: string;
         hq_id?: string;
         role?: string;
+        timezone?: string;
       };
     }
   }

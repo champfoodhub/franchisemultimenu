@@ -1,0 +1,95 @@
+import { Router, RequestHandler } from 'express';
+import { authMiddleware } from '../middlewares/auth.middleware';
+import { allowRoles } from '../middlewares/role.middleware';
+import { validate } from '../middlewares/validate';
+import {
+  createSchedule,
+  getSchedules,
+  getScheduleById,
+  updateSchedule,
+  deleteSchedule,
+  addScheduleItems,
+  removeScheduleItem,
+  getScheduleItems,
+  getTimeBasedMenu,
+  getAvailableTimeSlots,
+} from '../controllers/schedule.controller';
+import {
+  createScheduleSchema,
+  updateScheduleSchema,
+  addScheduleItemsSchema,
+  branchMenuQuerySchema,
+  getScheduleItemsSchema,
+  removeScheduleItemSchema,
+} from '../validators/schedule.schemas';
+
+const router = Router();
+
+// ============================================
+// HQ Admin Routes
+// ============================================
+
+// Apply HQ admin authentication to all routes
+router.use(authMiddleware as RequestHandler);
+router.use(allowRoles('HQ_ADMIN') as RequestHandler);
+
+// Schedule CRUD operations
+router.post(
+  '/schedules',
+  validate(createScheduleSchema) as RequestHandler,
+  createSchedule
+);
+
+router.get(
+  '/schedules',
+  getSchedules
+);
+
+router.get(
+  '/schedules/:id',
+  getScheduleById
+);
+
+router.put(
+  '/schedules/:id',
+  validate(updateScheduleSchema) as RequestHandler,
+  updateSchedule
+);
+
+router.delete(
+  '/schedules/:id',
+  deleteSchedule
+);
+
+// Schedule Items management
+router.get(
+  '/schedules/:schedule_id/items',
+  validate(getScheduleItemsSchema) as RequestHandler,
+  getScheduleItems
+);
+
+router.post(
+  '/schedule-items',
+  validate(addScheduleItemsSchema) as RequestHandler,
+  addScheduleItems
+);
+
+router.delete(
+  '/schedule-items/:item_id',
+  validate(removeScheduleItemSchema) as RequestHandler,
+  removeScheduleItem
+);
+
+// Available time slots for a date
+router.get(
+  '/time-slots',
+  getAvailableTimeSlots
+);
+
+// ============================================
+// Branch Routes (separate router mounted in app.ts)
+// Note: Branch routes have different middleware configuration
+// ============================================
+
+export default router;
+
