@@ -6,7 +6,7 @@ export interface ApiResponse<T> {
   data?: T;
 }
 
-/**
+/*
  * Success response helper
  */
 export const success = <T>(
@@ -24,7 +24,7 @@ export const success = <T>(
 /**
  * Error response helper
  */
-export const error = (
+export const  error = (
   res: Response,
   message = 'Error',
   code = 400
