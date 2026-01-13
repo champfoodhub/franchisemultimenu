@@ -65,7 +65,11 @@ export const timeStringToDate = (timeStr: string, date: Date = new Date()): Date
 export const compareTimeStrings = (time1: string, time2: string): number => {
   const date1 = timeStringToDate(time1);
   const date2 = timeStringToDate(time2);
-  return date1.getTime() - date2.getTime();
+  const diff = date1.getTime() - date2.getTime();
+  
+  if (diff < 0) return -1;
+  if (diff > 0) return 1;
+  return 0;
 };
 
 /**

@@ -17,84 +17,47 @@ const dayOfWeekSchema = z
  * Create schedule validation schema (HQ)
  * Validates time slots (breakfast, lunch, dinner) and seasonal menus
  */
-export const createScheduleSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Schedule name is required')
-    .min(2, 'Schedule name must be at least 2 characters')
-    .max(100, 'Schedule name must be less than 100 characters'),
-  type: scheduleTypeSchema,
-  
-  // Time slot specific fields
-  start_time: z
-    .string()
-    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (use HH:MM)')
-    .optional(),
-  end_time: z
-    .string()
-    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (use HH:MM)')
-    .optional(),
-  
-  // Seasonal specific fields
-  start_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (use YYYY-MM-DD)')
-    .optional(),
-  end_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (use YYYY-MM-DD)')
-    .optional(),
-  
-  // Common fields
-  timezone: z
-    .string()
-    .min(1, 'Timezone is required')
-    .default('UTC'),
-  day_of_week: dayOfWeekSchema.optional(),
-  is_active: z.boolean().default(true),
-});
-
-// Custom validation for time slots
-createScheduleSchema.refine(
-  (data) => {
-    if (data.type === 'TIME_SLOT') {
-      if (!data.start_time || !data.end_time) {
-        return false;
-      }
-      // Check if times are in valid format
-      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
-      if (!timeRegex.test(data.start_time) || !timeRegex.test(data.end_time)) {
-        return false;
-      }
-    }
-    return true;
-  },
-  {
-    message: 'Start time and end time are required for TIME_SLOT schedules',
-    path: ['start_time'],
-  }
-);
-
-// Custom validation for seasonal schedules
-createScheduleSchema.refine(
-  (data) => {
-    if (data.type === 'SEASONAL') {
-      if (!data.start_date || !data.end_date) {
-        return false;
-      }
-      // Check if dates are in valid format
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(data.start_date) || !dateRegex.test(data.end_date)) {
-        return false;
-      }
-    }
-    return true;
-  },
-  {
-    message: 'Start date and end date are required for SEASONAL schedules',
-    path: ['start_date'],
-  }
-);
+export const createScheduleSchema = z.discriminatedUnion('type', [
+  // TIME_SLOT schedule schema
+  z.object({
+    name: z
+      .string()
+      .min(1, 'Schedule name is required')
+      .min(2, 'Schedule name must be at least 2 characters')
+      .max(100, 'Schedule name must be less than 100 characters'),
+    type: z.literal('TIME_SLOT'),
+    start_time: z
+      .string()
+      .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (use HH:MM)')
+      .min(1, 'Start time is required for TIME_SLOT schedules'),
+    end_time: z
+      .string()
+      .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Invalid time format (use HH:MM)')
+      .min(1, 'End time is required for TIME_SLOT schedules'),
+    timezone: z.string().optional().catch(() => 'UTC'),
+    day_of_week: dayOfWeekSchema.min(1, 'At least one day of week is required'),
+    is_active: z.boolean().optional().catch(() => true),
+  }),
+  // SEASONAL schedule schema
+  z.object({
+    name: z
+      .string()
+      .min(1, 'Schedule name is required')
+      .min(2, 'Schedule name must be at least 2 characters')
+      .max(100, 'Schedule name must be less than 100 characters'),
+    type: z.literal('SEASONAL'),
+    start_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (use YYYY-MM-DD)')
+      .min(1, 'Start date is required for SEASONAL schedules'),
+    end_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (use YYYY-MM-DD)')
+      .min(1, 'End date is required for SEASONAL schedules'),
+    timezone: z.string().optional().catch(() => 'UTC'),
+    is_active: z.boolean().optional().catch(() => true),
+  }),
+]);
 
 /**
  * Update schedule validation schema (HQ)
@@ -180,8 +143,8 @@ export const addScheduleItemsSchema = z.object({
     .array(z.string().uuid('Each item ID must be a valid UUID'))
     .min(1, 'At least one menu item ID is required')
     .max(50, 'Maximum 50 items can be added at once'),
-  priority: z.number().int().min(0).max(100).optional(),
-  is_featured: z.boolean().optional(),
+  priority: z.number().int().min(0).max(100).default(0),
+  is_featured: z.boolean().default(false),
 });
 
 /**
