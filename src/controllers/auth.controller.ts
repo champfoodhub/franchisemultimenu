@@ -1,14 +1,11 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { success, error } from '../utils/response';
-
-interface LoginRequestBody {
-  email: string;
-  password: string;
-}
+import { SuccessMessage, ErrorMessage } from '../utils/errormessage';
+import { LoginInput } from '../validators/schemas';
 
 export const login = async (
-  req: Request<{}, {}, LoginRequestBody>,
+  req: Request<{}, {}, LoginInput>,
   res: Response
 ): Promise<Response> => {
   const { email, password } = req.body;
@@ -23,5 +20,6 @@ export const login = async (
     return error(res, authError.message, 401);
   }
 
-  return success(res, data, 'Login successful');
+  return success(res, data, SuccessMessage.LOGIN_SUCCESSFUL);
 };
+

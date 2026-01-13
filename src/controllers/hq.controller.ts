@@ -1,14 +1,8 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { success, error } from '../utils/response';
-
-declare global {
-  namespace Express {
-    interface User {
-      hq_id?: string;
-    }
-  }
-}
+import { ErrorMessage, SuccessMessage } from '../utils/errormessage';
+import { CreateProductInput, UpdateProductInput } from '../validators/schemas';
 
 type AuthenticatedRequest = Request;
 
@@ -18,11 +12,11 @@ type AuthenticatedRequest = Request;
 export const createProduct = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<Response | void> => {
-  const { name, base_price, category } = req.body;
+): Promise<Response> => {
+  const { name, base_price, category } = req.body as CreateProductInput;
 
   if (!req.user?.hq_id) {
-    return error(res, 'HQ not assigned', 403);
+    return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
   const { data, error: err } = await supabase.from('products').insert({
@@ -34,7 +28,7 @@ export const createProduct = async (
 
   if (err) return error(res, err.message);
 
-  return success(res, data, 'Product created');
+  return success(res, data, SuccessMessage.PRODUCT_CREATED);
 };
 
 /**
@@ -43,22 +37,24 @@ export const createProduct = async (
 export const updateProduct = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<Response | void> => {
+): Promise<Response> => {
   const { id } = req.params;
 
   if (!req.user?.hq_id) {
-    return error(res, 'HQ not assigned', 403);
+    return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
+
+  const updateData = req.body as UpdateProductInput;
 
   const { data, error: err } = await supabase
     .from('products')
-    .update(req.body)
+    .update(updateData)
     .eq('id', id)
     .eq('hq_id', req.user.hq_id);
 
   if (err) return error(res, err.message);
 
-  return success(res, data, 'Product updated');
+  return success(res, data, SuccessMessage.PRODUCT_UPDATED);
 };
 
 /**
@@ -67,7 +63,7 @@ export const updateProduct = async (
 export const deleteProduct = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<Response | void> => {
+): Promise<Response> => {
   const { id } = req.params;
 
   const { error: err } = await supabase
@@ -77,7 +73,7 @@ export const deleteProduct = async (
 
   if (err) return error(res, err.message);
 
-  return success(res, null, 'Product disabled');
+  return success(res, null, SuccessMessage.PRODUCT_DISABLED);
 };
 
 /**
@@ -86,10 +82,11 @@ export const deleteProduct = async (
 export const stockReport = async (
   _req: Request,
   res: Response
-): Promise<Response | void> => {
+): Promise<Response> => {
   const { data, error: err } = await supabase.rpc('hq_stock_report');
 
   if (err) return error(res, err.message);
 
-  return success(res, data);
+  return success(res, data, SuccessMessage.STOCK_REPORT_RETRIEVED);
 };
+

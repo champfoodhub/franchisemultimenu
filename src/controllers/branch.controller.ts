@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { success, error } from '../utils/response';
+import { ErrorMessage, SuccessMessage } from '../utils/errormessage';
+import { StockUpdateInput, DiscountUpdateInput } from '../validators/schemas';
 
 /**
  * Custom request type to include authenticated user
  */
-type AuthenticatedRequest = Request & {
+export type AuthenticatedRequest = Request & {
   user?: {
     id: string;
     branch_id: string;
@@ -19,12 +21,12 @@ type AuthenticatedRequest = Request & {
 export const updateStock = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<Response | void> => {
+): Promise<Response> => {
   const { id } = req.params;
-  const { stock } = req.body;
+  const { stock } = req.body as StockUpdateInput;
 
   if (!req.user?.branch_id) {
-    return error(res, 'Branch not assigned', 403);
+    return error(res, ErrorMessage.BRANCH_NOT_ASSIGNED, 403);
   }
 
   const { error: err } = await supabase
@@ -35,7 +37,7 @@ export const updateStock = async (
 
   if (err) return error(res, err.message);
 
-  return success(res, null, 'Stock updated');
+  return success(res, null, SuccessMessage.STOCK_UPDATED);
 };
 
 /**
@@ -44,16 +46,12 @@ export const updateStock = async (
 export const updateDiscount = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<Response | void> => {
+): Promise<Response> => {
   const { id } = req.params;
-  const { discount } = req.body;
+  const { discount } = req.body as DiscountUpdateInput;
 
   if (!req.user?.branch_id) {
-    return error(res, 'Branch not assigned', 403);
-  }
-
-  if (discount > 30) {
-    return error(res, 'Discount exceeds limit', 400);
+    return error(res, ErrorMessage.BRANCH_NOT_ASSIGNED, 403);
   }
 
   const { error: err } = await supabase
@@ -64,7 +62,7 @@ export const updateDiscount = async (
 
   if (err) return error(res, err.message);
 
-  return success(res, null, 'Discount updated');
+  return success(res, null, SuccessMessage.DISCOUNT_UPDATED);
 };
 
 /**
@@ -73,9 +71,9 @@ export const updateDiscount = async (
 export const getMenu = async (
   req: AuthenticatedRequest,
   res: Response
-): Promise<Response | void> => {
+): Promise<Response> => {
   if (!req.user?.branch_id) {
-    return error(res, 'Branch not assigned', 403);
+    return error(res, ErrorMessage.BRANCH_NOT_ASSIGNED, 403);
   }
 
   const { data, error: err } = await supabase.rpc('branch_menu', {
@@ -84,5 +82,6 @@ export const getMenu = async (
 
   if (err) return error(res, err.message);
 
-  return success(res, data, 'Menu retrieved');
+  return success(res, data, SuccessMessage.MENU_RETRIEVED);
 };
+

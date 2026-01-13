@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { authMiddleware } from '../middlewares/auth.middleware';
+import { allowRoles } from '../middlewares/role.middleware';
+import { validate } from '../middlewares/validate';
+import { updateStock, updateDiscount, getMenu, } from '../controllers/branch.controller';
+import { stockUpdateSchema, discountUpdateSchema } from '../validators/schemas';
+const router = Router();
+router.use(authMiddleware);
+router.use(allowRoles('BRANCH_MANAGER'));
+router.patch('/products/:id/stock', validate(stockUpdateSchema), updateStock);
+router.patch('/products/:id/discount', validate(discountUpdateSchema), updateDiscount);
+router.get('/menu', getMenu);
+export default router;
