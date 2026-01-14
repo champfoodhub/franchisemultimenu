@@ -15,7 +15,26 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
   const [endTime, setEndTime] = useState(schedule?.end_time || '');
   const [startDate, setStartDate] = useState(schedule?.start_date || '');
   const [endDate, setEndDate] = useState(schedule?.end_date || '');
+  const [dayOfWeek, setDayOfWeek] = useState<number[]>(schedule?.day_of_week || []);
   const { token } = useAuthStore();
+
+  const days = [
+    { value: 0, label: 'Sunday' },
+    { value: 1, label: 'Monday' },
+    { value: 2, label: 'Tuesday' },
+    { value: 3, label: 'Wednesday' },
+    { value: 4, label: 'Thursday' },
+    { value: 5, label: 'Friday' },
+    { value: 6, label: 'Saturday' },
+  ];
+
+  const toggleDay = (day: number) => {
+    setDayOfWeek((prev) =>
+      prev.includes(day)
+        ? prev.filter((d) => d !== day)
+        : [...prev, day]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +45,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
       end_time: type === 'TIME_SLOT' ? endTime : undefined,
       start_date: type === 'SEASONAL' ? startDate : undefined,
       end_date: type === 'SEASONAL' ? endDate : undefined,
+      day_of_week: type === 'TIME_SLOT' ? dayOfWeek : undefined,
     };
     try {
       if (schedule) {
@@ -53,6 +73,8 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
           className="w-full px-3 py-2 border rounded-lg"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          placeholder="e.g., Breakfast Menu, Summer Special"
+          required
         />
       </div>
       <div className="mb-4">
@@ -75,6 +97,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
               className="w-full px-3 py-2 border rounded-lg"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
+              required
             />
           </div>
           <div className="mb-4">
@@ -84,7 +107,27 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
               className="w-full px-3 py-2 border rounded-lg"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
+              required
             />
+          </div>
+          <div className="mb-4">
+            <label className="block text-gray-700 mb-2">Days of Week</label>
+            <div className="flex flex-wrap gap-2">
+              {days.map((day) => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => toggleDay(day.value)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    dayOfWeek.includes(day.value)
+                      ? 'bg-red-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -97,6 +140,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
               className="w-full px-3 py-2 border rounded-lg"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              required
             />
           </div>
           <div className="mb-4">
@@ -106,15 +150,16 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSuccess }) => {
               className="w-full px-3 py-2 border rounded-lg"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
+              required
             />
           </div>
         </>
       )}
       <button
         type="submit"
-        className="w-full bg-primary text-secondary py-2 rounded-lg"
+        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors"
       >
-        {schedule ? 'Save' : 'Create'}
+        {schedule ? 'Save Changes' : 'Create Schedule'}
       </button>
     </form>
   );

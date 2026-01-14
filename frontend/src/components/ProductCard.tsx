@@ -4,7 +4,7 @@ import { Product } from '../types';
 interface ProductCardProps {
   product: Product;
   onEdit?: (product: Product) => void;
-  onDelete?: (id: number) => void;
+  onDelete?: (id: string) => void;
   showActions?: boolean;
 }
 
@@ -20,7 +20,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex justify-between items-start">
           <div>
             <h3 className="text-lg font-bold text-gray-800">{product.name}</h3>
-            <p className="text-red-600 font-semibold text-lg">${product.price.toFixed(2)}</p>
+            <p className="text-red-600 font-semibold text-lg">${product.base_price.toFixed(2)}</p>
+            {product.category && (
+              <p className="text-gray-500 text-sm">{product.category}</p>
+            )}
           </div>
           <div className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium">
             Product

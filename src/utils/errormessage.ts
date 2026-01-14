@@ -78,10 +78,12 @@ export const SuccessMessage = {
   PRODUCT_CREATED: 'Product created',
   PRODUCT_UPDATED: 'Product updated',
   PRODUCT_DISABLED: 'Product disabled',
+  PRODUCT_RETRIEVED: 'Product retrieved',
   MENU_ITEM_UPDATED_SUCCESSFULLY: 'Menu item updated successfully',
   MENU_ITEM_DELETED_SUCCESSFULLY: 'Menu item deleted successfully',
   BRANCH_MENU_UPDATED: 'Branch menu updated',
   STOCK_REPORT_RETRIEVED: 'Stock report retrieved',
+  BRANCH_RETRIEVED: 'Branch retrieved',
 
   // Schedule success messages
   SCHEDULE_CREATED: 'Schedule created successfully',

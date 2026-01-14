@@ -93,7 +93,7 @@ const Menu = () => {
               category={item.category}
               stock={item.stock}
               discount={item.discount}
-              isActive={item.active}
+              isActive={item.active !== undefined ? item.active : item.is_active}
               isOutOfStock={(item.stock || 0) === 0}
             />
           ))}

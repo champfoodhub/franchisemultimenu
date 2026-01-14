@@ -10,12 +10,13 @@ interface ProductFormProps {
 
 const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess }) => {
   const [name, setName] = useState(product?.name || '');
-  const [price, setPrice] = useState(product?.price || 0);
+  const [basePrice, setBasePrice] = useState(product?.base_price || 0);
+  const [category, setCategory] = useState(product?.category || '');
   const { token } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const productData = { name, price };
+    const productData = { name, base_price: basePrice, category };
     try {
       if (product) {
         await api.put(`/hq/products/${product.id}`, productData, {
@@ -42,22 +43,36 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, onSuccess }) => {
           className="w-full px-3 py-2 border rounded-lg"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          required
         />
       </div>
       <div className="mb-4">
-        <label className="block text-gray-700">Price</label>
+        <label className="block text-gray-700">Base Price</label>
         <input
           type="number"
+          step="0.01"
+          min="0"
           className="w-full px-3 py-2 border rounded-lg"
-          value={price}
-          onChange={(e) => setPrice(Number(e.target.value))}
+          value={basePrice}
+          onChange={(e) => setBasePrice(Number(e.target.value))}
+          required
+        />
+      </div>
+      <div className="mb-4">
+        <label className="block text-gray-700">Category</label>
+        <input
+          type="text"
+          className="w-full px-3 py-2 border rounded-lg"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="e.g., Burgers, Drinks, Desserts"
         />
       </div>
       <button
         type="submit"
-        className="w-full bg-primary text-secondary py-2 rounded-lg"
+        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg transition-colors"
       >
-        {product ? 'Save' : 'Create'}
+        {product ? 'Save Changes' : 'Create Product'}
       </button>
     </form>
   );

@@ -5,27 +5,17 @@ import { ErrorMessage, SuccessMessage } from '../utils/errormessage';
 import { StockUpdateInput, DiscountUpdateInput } from '../validators/schemas';
 
 /**
- * Custom request type to include authenticated user
- */
-export type AuthenticatedRequest = Request & {
-  user?: {
-    id: string;
-    branch_id: string;
-    role?: string;
-  };
-};
-
-/**
  * Update product stock for a branch
  */
 export const updateStock = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response
 ): Promise<Response> => {
   const { id } = req.params;
   const { stock } = req.body as StockUpdateInput;
+  const branchId = req.user?.branch_id;
 
-  if (!req.user?.branch_id) {
+  if (!branchId) {
     return error(res, ErrorMessage.BRANCH_NOT_ASSIGNED, 403);
   }
 
@@ -33,7 +23,7 @@ export const updateStock = async (
     .from('branch_products')
     .update({ stock })
     .eq('product_id', id)
-    .eq('branch_id', req.user.branch_id);
+    .eq('branch_id', branchId);
 
   if (err) return error(res, err.message);
 
@@ -44,13 +34,14 @@ export const updateStock = async (
  * Update product discount for a branch
  */
 export const updateDiscount = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response
 ): Promise<Response> => {
   const { id } = req.params;
   const { discount } = req.body as DiscountUpdateInput;
+  const branchId = req.user?.branch_id;
 
-  if (!req.user?.branch_id) {
+  if (!branchId) {
     return error(res, ErrorMessage.BRANCH_NOT_ASSIGNED, 403);
   }
 
@@ -58,7 +49,7 @@ export const updateDiscount = async (
     .from('branch_products')
     .update({ discount })
     .eq('product_id', id)
-    .eq('branch_id', req.user.branch_id);
+    .eq('branch_id', branchId);
 
   if (err) return error(res, err.message);
 
@@ -69,15 +60,17 @@ export const updateDiscount = async (
  * Get branch-specific menu using Supabase RPC
  */
 export const getMenu = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response
 ): Promise<Response> => {
-  if (!req.user?.branch_id) {
+  const branchId = req.user?.branch_id;
+
+  if (!branchId) {
     return error(res, ErrorMessage.BRANCH_NOT_ASSIGNED, 403);
   }
 
   const { data, error: err } = await supabase.rpc('branch_menu', {
-    branch_id_input: req.user.branch_id,
+    branch_id_input: branchId,
   });
 
   if (err) return error(res, err.message);

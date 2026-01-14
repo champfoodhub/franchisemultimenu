@@ -31,7 +31,7 @@ const router = Router();
 
 // Apply HQ admin authentication to all routes
 router.use(authMiddleware as RequestHandler);
-router.use(allowRoles('HQ_ADMIN') as RequestHandler);
+router.use(allowRoles('HQ') as RequestHandler);
 
 // Schedule CRUD operations
 router.post(

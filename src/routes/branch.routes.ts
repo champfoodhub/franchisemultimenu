@@ -14,7 +14,7 @@ import { branchMenuQuerySchema } from '../validators/schedule.schemas';
 const router = Router();
 
 router.use(authMiddleware as RequestHandler);
-router.use(allowRoles('BRANCH_MANAGER') as RequestHandler);
+router.use(allowRoles('BRANCH') as RequestHandler);
 
 // Product management endpoints
 router.patch('/products/:id/stock', validate(stockUpdateSchema), updateStock as RequestHandler);

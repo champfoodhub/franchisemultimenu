@@ -59,19 +59,20 @@ const StockReports = () => {
     loadData();
   }, [fetchBranches, fetchProducts, fetchStocks]);
 
-  const getProductName = (productId: number) => {
-    return products.find((p) => p.id === productId)?.name || `Product ${productId}`;
+  const getProductName = (productId: string) => {
+    const product = products.find((p) => p.id === productId);
+    return product?.name || `Product ${productId}`;
   };
 
-  const getTotalStock = (branchId: number) => {
+  const getTotalStock = (branchId: string) => {
     return stocks
       .filter((stock) => stock.branch_id === branchId)
-      .reduce((sum, stock) => sum + stock.quantity, 0);
+      .reduce((sum, stock) => sum + stock.stock, 0);
   };
 
-  const getLowStockCount = (branchId: number) => {
+  const getLowStockCount = (branchId: string) => {
     return stocks.filter(
-      (stock) => stock.branch_id === branchId && stock.quantity < 10
+      (stock) => stock.branch_id === branchId && stock.stock < 10
     ).length;
   };
 

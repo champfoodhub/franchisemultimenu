@@ -1,53 +1,61 @@
 export interface User {
-  id: number;
+  id: string;
   email: string;
   role: 'HQ' | 'BRANCH';
+  hq_id?: string;
+  branch_id?: string;
 }
 
 export interface Product {
-  id: number;
+  id: string;
   name: string;
-  price: number;
+  base_price: number;
   category?: string;
+  is_active: boolean;
 }
 
 export interface Schedule {
-  id: number;
+  id: string;
   name: string;
   type: 'TIME_SLOT' | 'SEASONAL';
   start_time?: string;
   end_time?: string;
   start_date?: string;
   end_date?: string;
+  day_of_week?: number[];
+  timezone?: string;
+  is_active?: boolean;
 }
 
 export interface ScheduleItem {
-  id: number;
-  product_id: number;
-  schedule_id: number;
+  id: string;
+  product_id: string;
+  schedule_id: string;
 }
 
 export interface Branch {
-  id: number;
+  id: string;
   name: string;
 }
 
 export interface Stock {
-  id: number;
-  product_id: number;
-  branch_id: number;
-  quantity: number;
+  id: string;
+  product_id: string;
+  branch_id: string;
+  stock: number;
   discount?: number;
 }
 
 export interface MenuItem {
-  id: number;
-  product_id: number;
-  branch_id: number;
+  id: string;
+  product_id: string;
+  branch_id: string;
   price: number;
-  active: boolean;
+  is_active: boolean;
+  active?: boolean; // Alias for is_active used in some components
   stock?: number;
   discount?: number;
   category?: string;
   product_name?: string;
 }
+

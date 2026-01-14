@@ -18,7 +18,7 @@ const TimeBasedMenu = () => {
   const fetchSchedules = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/branch/schedules', {
+      const response = await api.get('/hq/schedules', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setSchedules(response.data);
@@ -30,33 +30,60 @@ const TimeBasedMenu = () => {
     }
   }, [token, showToast]);
 
-  const fetchMenuItems = useCallback(async () => {
-    if (!selectedSchedule) {
+  const fetchMenuItems = useCallback(async (scheduleId: string) => {
+    if (!scheduleId) {
       setMenuItems([]);
       return;
     }
-    
+
     try {
       setMenuLoading(true);
-      const response = await api.get(`/branch/menu/schedule/${selectedSchedule}`, {
+      // Use the time-based menu endpoint with schedule_id query param
+      const response = await api.get(`/branch/menu/time-based?schedule_id=${scheduleId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setMenuItems(response.data);
+      // Handle the response format from the backend
+      if (response.data && response.data.schedules && Array.isArray(response.data.schedules)) {
+        // Extract items from all active schedules
+        const allItems: MenuItem[] = [];
+        response.data.schedules.forEach((schedule: any) => {
+          if (schedule.items && Array.isArray(schedule.items)) {
+            schedule.items.forEach((item: any) => {
+              if (item.menu_items) {
+                allItems.push({
+                  id: item.id,
+                  product_id: item.menu_item_id,
+                  branch_id: '',
+                  price: item.menu_items.price || 0,
+                  is_active: item.menu_items.is_active || false,
+                  active: item.menu_items.is_active || false,
+                  product_name: item.menu_items.name,
+                  category: item.menu_items.category,
+                });
+              }
+            });
+          }
+        });
+        setMenuItems(allItems);
+      } else {
+        setMenuItems([]);
+      }
     } catch (error) {
       showToast('Failed to fetch menu items', 'error');
       console.error('Failed to fetch menu items', error);
     } finally {
       setMenuLoading(false);
     }
-  }, [selectedSchedule, token, showToast]);
+  }, [token, showToast]);
 
   useEffect(() => {
     fetchSchedules();
   }, [fetchSchedules]);
 
-  useEffect(() => {
-    fetchMenuItems();
-  }, [fetchMenuItems]);
+  const handleScheduleChange = (scheduleId: string) => {
+    setSelectedSchedule(scheduleId);
+    fetchMenuItems(scheduleId);
+  };
 
   if (loading) {
     return (
@@ -88,7 +115,7 @@ const TimeBasedMenu = () => {
         </label>
         <select
           value={selectedSchedule}
-          onChange={(e) => setSelectedSchedule(e.target.value)}
+          onChange={(e) => handleScheduleChange(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
         >
           <option value="">Choose a schedule...</option>
@@ -109,7 +136,7 @@ const TimeBasedMenu = () => {
         <>
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-700">
-              Items for: {schedules.find((s) => s.id.toString() === selectedSchedule)?.name}
+              Items for: {schedules.find((s) => s.id === selectedSchedule)?.name}
             </h3>
           </div>
           {menuItems.length === 0 ? (
@@ -129,7 +156,7 @@ const TimeBasedMenu = () => {
                   category={item.category}
                   stock={item.stock}
                   discount={item.discount}
-                  isActive={item.active}
+                  isActive={item.is_active}
                   isOutOfStock={(item.stock || 0) === 0}
                 />
               ))}

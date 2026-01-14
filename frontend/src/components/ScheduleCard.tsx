@@ -5,8 +5,8 @@ import { Schedule } from '../types';
 interface ScheduleCardProps {
   schedule: Schedule;
   onEdit?: (schedule: Schedule) => void;
-  onDelete?: (id: number) => void;
-  onManageItems?: (id: number) => void;
+  onDelete?: (id: string) => void;
+  onManageItems?: (id: string) => void;
 }
 
 const ScheduleCard: React.FC<ScheduleCardProps> = ({ 
