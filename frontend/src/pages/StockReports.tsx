@@ -167,14 +167,14 @@ const StockReports = () => {
                                 {getProductName(stock.product_id)}
                               </td>
                               <td className="py-3 px-3 text-right font-medium">
-                                {stock.quantity}
+                                {stock.stock}
                               </td>
                               <td className="py-3 px-3 text-right">
-                                {stock.quantity === 0 ? (
+                                {stock.stock === 0 ? (
                                   <span className="text-red-600 font-medium">
                                     Out of Stock
                                   </span>
-                                ) : stock.quantity < 10 ? (
+                                ) : stock.stock < 10 ? (
                                   <span className="text-yellow-600 font-medium">
                                     Low Stock
                                   </span>

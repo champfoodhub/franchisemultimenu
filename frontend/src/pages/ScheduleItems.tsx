@@ -104,7 +104,7 @@ const ScheduleItems = () => {
   };
 
   const getProductName = (productId: number) => {
-    return products.find((p) => p.id === productId)?.name || `Product ${productId}`;
+    return products.find((p) => p.id === String(productId))?.name || `Product ${productId}`;
   };
 
   const availableProducts = products.filter(
@@ -145,8 +145,8 @@ const ScheduleItems = () => {
           >
             <option value="">Select a product</option>
             {availableProducts.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name} - ${product.price}
+              <option key={product.id} value={String(product.id)}>
+                {product.name}
               </option>
             ))}
           </select>
@@ -180,12 +180,12 @@ const ScheduleItems = () => {
               <div key={item.id} className="bg-gray-50 rounded-lg p-4 flex justify-between items-center">
                 <div>
                   <h4 className="font-bold text-gray-800">
-                    {getProductName(item.product_id)}
+                    {getProductName(Number(item.product_id))}
                   </h4>
                   <p className="text-sm text-gray-500">ID: {item.id}</p>
                 </div>
                 <button
-                  onClick={() => handleRemoveItem(item.id)}
+                  onClick={() => handleRemoveItem(Number(item.id))}
                   disabled={actionLoading}
                   className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-sm transition-colors"
                 >
