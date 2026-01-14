@@ -21,7 +21,7 @@ const Login = () => {
     
     try {
       const response = await api.post('/auth/login', { email, password });
-      const { token, user } = response.data;
+      const { access_token: token, user } = response.data;
       setToken(token);
       setUser(user);
       showToast('Login successful!', 'success');
