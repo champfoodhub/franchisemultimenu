@@ -1,23 +1,51 @@
 import { Request, Response } from 'express';
-import { supabase } from '../config/supabase';
+import { query, queryOne, execute } from '../config/mysql';
 import { success, error } from '../utils/response';
 import { ErrorMessage, SuccessMessage } from '../utils/errormessage';
 import {
   CreateScheduleInput,
   UpdateScheduleInput,
   AddScheduleItemsInput,
-  BranchMenuQueryInput,
 } from '../validators/schedule.schemas';
 import {
   validateTimeRange,
   validateDateRange,
-  parseQueryTime,
-  parseQueryDate,
-  isTimeInRange,
-  isDateInRange,
-  getDayOfWeek,
-  getCurrentTimeInTimezone,
 } from '../utils/timezone';
+
+// Define interfaces
+interface MenuSchedule {
+  id: number;
+  hq_id: number;
+  name: string;
+  type: 'TIME_SLOT' | 'SEASONAL';
+  start_time: string | null;
+  end_time: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  timezone: string;
+  day_of_week: string | null; // JSON string
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface MenuScheduleItem {
+  id: number;
+  schedule_id: number;
+  menu_item_id: number;
+  priority: number;
+  is_featured: boolean;
+  created_at: Date;
+}
+
+interface MenuItem {
+  id: number;
+  name: string;
+  price: number;
+  category: string | null;
+  description: string | null;
+  is_active: boolean;
+}
 
 /**
  * Create a new menu schedule (HQ only)
@@ -47,28 +75,40 @@ export const createSchedule = async (
     }
   }
 
-  const { data, error: err } = await supabase
-    .from('menu_schedules')
-    .insert({
-      hq_id: req.user.hq_id,
-      name: scheduleData.name,
-      type: scheduleData.type,
-      start_time: scheduleData.start_time || null,
-      end_time: scheduleData.end_time || null,
-      start_date: scheduleData.start_date || null,
-      end_date: scheduleData.end_date || null,
-      timezone: scheduleData.timezone,
-      day_of_week: scheduleData.day_of_week || null,
-      is_active: scheduleData.is_active ?? true,
-    })
-    .select()
-    .single();
+  try {
+    // Convert day_of_week array to JSON string
+    const dayOfWeekJson = scheduleData.day_of_week 
+      ? JSON.stringify(scheduleData.day_of_week) 
+      : null;
 
-  if (err) {
-    return error(res, ErrorMessage.SCHEDULE_CREATION_FAILED, 400);
+    const result = await execute(
+      `INSERT INTO menu_schedules 
+       (hq_id, name, type, start_time, end_time, start_date, end_date, timezone, day_of_week, is_active) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.user.hq_id,
+        scheduleData.name,
+        scheduleData.type,
+        scheduleData.start_time || null,
+        scheduleData.end_time || null,
+        scheduleData.start_date || null,
+        scheduleData.end_date || null,
+        scheduleData.timezone || 'UTC',
+        dayOfWeekJson,
+        scheduleData.is_active ?? true,
+      ]
+    );
+
+    const schedule = await queryOne<MenuSchedule>(
+      `SELECT * FROM menu_schedules WHERE id = ?`,
+      [result.insertId]
+    );
+
+    return success(res, schedule, SuccessMessage.SCHEDULE_CREATED);
+  } catch (err) {
+    console.error('Create schedule error:', err);
+    return error(res, ErrorMessage.SCHEDULE_CREATION_FAILED, 500);
   }
-
-  return success(res, data, SuccessMessage.SCHEDULE_CREATED);
 };
 
 /**
@@ -84,27 +124,35 @@ export const getSchedules = async (
 
   const { type, is_active } = req.query;
 
-  let query = supabase
-    .from('menu_schedules')
-    .select('*')
-    .eq('hq_id', req.user.hq_id)
-    .order('created_at', { ascending: false });
+  try {
+    let sql = `SELECT * FROM menu_schedules WHERE hq_id = ?`;
+    const params: any[] = [req.user.hq_id];
 
-  if (type) {
-    query = query.eq('type', type);
+    if (type) {
+      sql += ` AND type = ?`;
+      params.push(type);
+    }
+
+    if (is_active !== undefined) {
+      sql += ` AND is_active = ?`;
+      params.push(is_active === 'true');
+    }
+
+    sql += ` ORDER BY created_at DESC`;
+
+    const schedules = await query<MenuSchedule>(sql, params);
+
+    // Parse day_of_week JSON for each schedule
+    const parsedSchedules = schedules.map((s: any) => ({
+      ...s,
+      day_of_week: s.day_of_week ? JSON.parse(s.day_of_week) : null,
+    }));
+
+    return success(res, parsedSchedules, SuccessMessage.SCHEDULE_RETRIEVED);
+  } catch (err) {
+    console.error('Get schedules error:', err);
+    return error(res, ErrorMessage.SERVER_ERROR, 500);
   }
-
-  if (is_active !== undefined) {
-    query = query.eq('is_active', is_active === 'true');
-  }
-
-  const { data, error: err } = await query;
-
-  if (err) {
-    return error(res, err.message, 400);
-  }
-
-  return success(res, data, SuccessMessage.SCHEDULE_RETRIEVED);
 };
 
 /**
@@ -120,18 +168,27 @@ export const getScheduleById = async (
     return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
-  const { data, error: err } = await supabase
-    .from('menu_schedules')
-    .select('*')
-    .eq('id', id)
-    .eq('hq_id', req.user.hq_id)
-    .single();
+  try {
+    const schedule = await queryOne<MenuSchedule>(
+      `SELECT * FROM menu_schedules WHERE id = ? AND hq_id = ?`,
+      [id, req.user.hq_id]
+    );
 
-  if (err || !data) {
-    return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    if (!schedule) {
+      return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    }
+
+    // Parse day_of_week JSON
+    const parsedSchedule = {
+      ...schedule,
+      day_of_week: schedule.day_of_week ? JSON.parse(schedule.day_of_week) : null,
+    };
+
+    return success(res, parsedSchedule, SuccessMessage.SCHEDULE_RETRIEVED);
+  } catch (err) {
+    console.error('Get schedule by ID error:', err);
+    return error(res, ErrorMessage.SERVER_ERROR, 500);
   }
-
-  return success(res, data, SuccessMessage.SCHEDULE_RETRIEVED);
 };
 
 /**
@@ -162,19 +219,72 @@ export const updateSchedule = async (
     }
   }
 
-  const { data, error: err } = await supabase
-    .from('menu_schedules')
-    .update(updateData)
-    .eq('id', id)
-    .eq('hq_id', req.user.hq_id)
-    .select()
-    .single();
+  try {
+    const updates: string[] = [];
+    const values: any[] = [];
 
-  if (err || !data) {
-    return error(res, ErrorMessage.SCHEDULE_UPDATE_FAILED, 400);
+    if (updateData.name !== undefined) {
+      updates.push('name = ?');
+      values.push(updateData.name);
+    }
+    if (updateData.type !== undefined) {
+      updates.push('type = ?');
+      values.push(updateData.type);
+    }
+    if (updateData.start_time !== undefined) {
+      updates.push('start_time = ?');
+      values.push(updateData.start_time);
+    }
+    if (updateData.end_time !== undefined) {
+      updates.push('end_time = ?');
+      values.push(updateData.end_time);
+    }
+    if (updateData.start_date !== undefined) {
+      updates.push('start_date = ?');
+      values.push(updateData.start_date);
+    }
+    if (updateData.end_date !== undefined) {
+      updates.push('end_date = ?');
+      values.push(updateData.end_date);
+    }
+    if (updateData.timezone !== undefined) {
+      updates.push('timezone = ?');
+      values.push(updateData.timezone);
+    }
+    if (updateData.day_of_week !== undefined) {
+      updates.push('day_of_week = ?');
+      values.push(JSON.stringify(updateData.day_of_week));
+    }
+    if (updateData.is_active !== undefined) {
+      updates.push('is_active = ?');
+      values.push(updateData.is_active);
+    }
+
+    if (updates.length === 0) {
+      return error(res, ErrorMessage.BAD_REQUEST, 400);
+    }
+
+    values.push(id, req.user.hq_id);
+
+    await execute(
+      `UPDATE menu_schedules SET ${updates.join(', ')} WHERE id = ? AND hq_id = ?`,
+      values
+    );
+
+    const schedule = await queryOne<MenuSchedule>(
+      `SELECT * FROM menu_schedules WHERE id = ?`,
+      [id]
+    );
+
+    if (!schedule) {
+      return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    }
+
+    return success(res, schedule, SuccessMessage.SCHEDULE_UPDATED);
+  } catch (err) {
+    console.error('Update schedule error:', err);
+    return error(res, ErrorMessage.SCHEDULE_UPDATE_FAILED, 500);
   }
-
-  return success(res, data, SuccessMessage.SCHEDULE_UPDATED);
 };
 
 /**
@@ -190,28 +300,28 @@ export const deleteSchedule = async (
     return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
-  // First, delete associated schedule items
-  const { error: itemsErr } = await supabase
-    .from('menu_schedule_items')
-    .delete()
-    .eq('schedule_id', id);
+  try {
+    // First, delete associated schedule items
+    await execute(
+      `DELETE FROM menu_schedule_items WHERE schedule_id = ?`,
+      [id]
+    );
 
-  if (itemsErr) {
-    return error(res, ErrorMessage.SCHEDULE_DELETION_FAILED, 400);
+    // Then delete the schedule
+    const result = await execute(
+      `DELETE FROM menu_schedules WHERE id = ? AND hq_id = ?`,
+      [id, req.user.hq_id]
+    );
+
+    if (result.affectedRows === 0) {
+      return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    }
+
+    return success(res, null, SuccessMessage.SCHEDULE_DELETED);
+  } catch (err) {
+    console.error('Delete schedule error:', err);
+    return error(res, ErrorMessage.SCHEDULE_DELETION_FAILED, 500);
   }
-
-  // Then delete the schedule
-  const { error: err } = await supabase
-    .from('menu_schedules')
-    .delete()
-    .eq('id', id)
-    .eq('hq_id', req.user.hq_id);
-
-  if (err) {
-    return error(res, ErrorMessage.SCHEDULE_DELETION_FAILED, 400);
-  }
-
-  return success(res, null, SuccessMessage.SCHEDULE_DELETED);
 };
 
 /**
@@ -227,36 +337,48 @@ export const addScheduleItems = async (
     return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
-  // Verify schedule belongs to this HQ
-  const { data: schedule, error: scheduleErr } = await supabase
-    .from('menu_schedules')
-    .select('id')
-    .eq('id', schedule_id)
-    .eq('hq_id', req.user.hq_id)
-    .single();
+  try {
+    // Verify schedule belongs to this HQ
+    const schedule = await queryOne<MenuSchedule>(
+      `SELECT id FROM menu_schedules WHERE id = ? AND hq_id = ?`,
+      [schedule_id, req.user.hq_id]
+    );
 
-  if (scheduleErr || !schedule) {
-    return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    if (!schedule) {
+      return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    }
+
+    // Prepare items for insertion
+    const itemsToInsert = menu_item_ids.map((menuItemId: number) => ({
+      schedule_id,
+      menu_item_id: menuItemId,
+      priority: priority ?? 0,
+      is_featured: is_featured ?? false,
+    }));
+
+    // Insert items
+    for (const item of itemsToInsert) {
+      await execute(
+        `INSERT INTO menu_schedule_items (schedule_id, menu_item_id, priority, is_featured) 
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE priority = VALUES(priority), is_featured = VALUES(is_featured)`,
+        [item.schedule_id, item.menu_item_id, item.priority, item.is_featured]
+      );
+    }
+
+    const items = await query<any>(
+      `SELECT msi.*, m.name as menu_item_name, m.price, m.category
+       FROM menu_schedule_items msi
+       JOIN menu m ON msi.menu_item_id = m.id
+       WHERE msi.schedule_id = ?`,
+      [schedule_id]
+    );
+
+    return success(res, items, SuccessMessage.SCHEDULE_ITEMS_ADDED);
+  } catch (err) {
+    console.error('Add schedule items error:', err);
+    return error(res, ErrorMessage.SCHEDULE_ITEM_CREATION_FAILED, 500);
   }
-
-  // Prepare items for insertion
-  const itemsToInsert = menu_item_ids.map((menuItemId: string) => ({
-    schedule_id,
-    menu_item_id: menuItemId,
-    priority: priority ?? 0,
-    is_featured: is_featured ?? false,
-  }));
-
-  const { data, error: err } = await supabase
-    .from('menu_schedule_items')
-    .insert(itemsToInsert)
-    .select();
-
-  if (err) {
-    return error(res, ErrorMessage.SCHEDULE_ITEM_CREATION_FAILED, 400);
-  }
-
-  return success(res, data, SuccessMessage.SCHEDULE_ITEMS_ADDED);
 };
 
 /**
@@ -272,40 +394,32 @@ export const removeScheduleItem = async (
     return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
-  // Get the schedule item to verify ownership
-  const { data: scheduleItem, error: itemErr } = await supabase
-    .from('menu_schedule_items')
-    .select('id, schedule_id')
-    .eq('id', item_id)
-    .single();
+  try {
+    // Get the schedule item to verify ownership
+    const scheduleItem = await queryOne<MenuScheduleItem>(
+      `SELECT msi.*, ms.hq_id 
+       FROM menu_schedule_items msi
+       JOIN menu_schedules ms ON msi.schedule_id = ms.id
+       WHERE msi.id = ?`,
+      [item_id]
+    );
 
-  if (itemErr || !scheduleItem) {
-    return error(res, ErrorMessage.SCHEDULE_ITEM_NOT_FOUND, 404);
+    if (!scheduleItem) {
+      return error(res, ErrorMessage.SCHEDULE_ITEM_NOT_FOUND, 404);
+    }
+
+    if (scheduleItem.hq_id !== req.user.hq_id) {
+      return error(res, ErrorMessage.FORBIDDEN, 403);
+    }
+
+    // Delete the schedule item
+    await execute(`DELETE FROM menu_schedule_items WHERE id = ?`, [item_id]);
+
+    return success(res, null, SuccessMessage.SCHEDULE_ITEMS_REMOVED);
+  } catch (err) {
+    console.error('Remove schedule item error:', err);
+    return error(res, ErrorMessage.SCHEDULE_ITEM_DELETION_FAILED, 500);
   }
-
-  // Verify schedule belongs to this HQ
-  const { data: schedule, error: scheduleErr } = await supabase
-    .from('menu_schedules')
-    .select('id')
-    .eq('id', scheduleItem.schedule_id)
-    .eq('hq_id', req.user.hq_id)
-    .single();
-
-  if (scheduleErr || !schedule) {
-    return error(res, ErrorMessage.FORBIDDEN, 403);
-  }
-
-  // Delete the schedule item
-  const { error: err } = await supabase
-    .from('menu_schedule_items')
-    .delete()
-    .eq('id', item_id);
-
-  if (err) {
-    return error(res, ErrorMessage.SCHEDULE_ITEM_DELETION_FAILED, 400);
-  }
-
-  return success(res, null, SuccessMessage.SCHEDULE_ITEMS_REMOVED);
 };
 
 /**
@@ -321,39 +435,37 @@ export const getScheduleItems = async (
     return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
-  // Verify schedule belongs to this HQ
-  const { data: schedule, error: scheduleErr } = await supabase
-    .from('menu_schedules')
-    .select('id')
-    .eq('id', schedule_id)
-    .eq('hq_id', req.user.hq_id)
-    .single();
+  try {
+    // Verify schedule belongs to this HQ
+    const schedule = await queryOne<MenuSchedule>(
+      `SELECT id FROM menu_schedules WHERE id = ? AND hq_id = ?`,
+      [schedule_id, req.user.hq_id]
+    );
 
-  if (scheduleErr || !schedule) {
-    return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    if (!schedule) {
+      return error(res, ErrorMessage.SCHEDULE_NOT_FOUND, 404);
+    }
+
+    const items = await query<any>(
+      `SELECT 
+        msi.*,
+        m.id as menu_item_id,
+        m.name as menu_item_name,
+        m.price,
+        m.category,
+        m.is_active
+       FROM menu_schedule_items msi
+       JOIN menu m ON msi.menu_item_id = m.id
+       WHERE msi.schedule_id = ?
+       ORDER BY msi.priority ASC, msi.created_at ASC`,
+      [schedule_id]
+    );
+
+    return success(res, items, SuccessMessage.SCHEDULE_RETRIEVED);
+  } catch (err) {
+    console.error('Get schedule items error:', err);
+    return error(res, ErrorMessage.SERVER_ERROR, 500);
   }
-
-  const { data, error: err } = await supabase
-    .from('menu_schedule_items')
-    .select(`
-      *,
-      menu_items:menu_item_id (
-        id,
-        name,
-        price,
-        category,
-        is_active
-      )
-    `)
-    .eq('schedule_id', schedule_id)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: true });
-
-  if (err) {
-    return error(res, err.message, 400);
-  }
-
-  return success(res, data, SuccessMessage.SCHEDULE_RETRIEVED);
 };
 
 /**
@@ -364,18 +476,15 @@ export const getTimeBasedMenu = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  // Get branch timezone (default to UTC if not specified)
-  const branchTimezone = req.user?.timezone || 'UTC';
-  
   // Parse query parameters
-  const timeParam = parseQueryTime(req.query.time as string);
-  const dateParam = parseQueryDate(req.query.date as string);
-  const scheduleTypeFilter = req.query.schedule_type as string | undefined;
-  
+  const timeParam = req.query.time as string;
+  const dateParam = req.query.date as string;
+  const scheduleTypeFilter = (req.query.schedule_type as string) || 'ALL';
+
   // Use current time if not specified
-  const now = dateParam || new Date();
+  const now = dateParam ? new Date(dateParam) : new Date();
   const currentTime = timeParam || now.toTimeString().slice(0, 5);
-  
+
   // Get HQ ID from either HQ user or Branch user
   const hqId = req.user?.hq_id;
   const branchId = req.user?.branch_id;
@@ -387,114 +496,103 @@ export const getTimeBasedMenu = async (
   // Get HQ ID from branch if needed
   const targetHqId = hqId || branchId;
 
-  // Get all active schedules for this HQ
-  let schedulesQuery = supabase
-    .from('menu_schedules')
-    .select('*')
-    .eq('hq_id', targetHqId)
-    .eq('is_active', true);
+  try {
+    // Get all active schedules for this HQ
+    let sql = `SELECT * FROM menu_schedules WHERE hq_id = ? AND is_active = true`;
+    const params: any[] = [targetHqId];
 
-  if (scheduleTypeFilter && scheduleTypeFilter !== 'ALL') {
-    schedulesQuery = schedulesQuery.eq('type', scheduleTypeFilter);
-  }
-
-  const { data: schedules, error: schedulesErr } = await schedulesQuery;
-
-  if (schedulesErr) {
-    return error(res, schedulesErr.message, 400);
-  }
-
-  if (!schedules || schedules.length === 0) {
-    return success(res, [], SuccessMessage.MENU_RETRIEVED);
-  }
-
-  // Filter schedules based on current time/date and timezone
-  const activeSchedules = schedules.filter((schedule) => {
-    if (schedule.type === 'TIME_SLOT') {
-      // Convert current time to schedule timezone for comparison
-      const scheduleTime = getCurrentTimeInTimezone(schedule.timezone);
-      const scheduleTimeStr = scheduleTime.toTimeString().slice(0, 5);
-      
-      // Check if current time is within the time slot
-      if (!isTimeInRange(scheduleTimeStr, schedule.start_time, schedule.end_time)) {
-        return false;
-      }
-      
-      // Check day of week if specified
-      if (schedule.day_of_week && schedule.day_of_week.length > 0) {
-        const currentDay = getDayOfWeek(now);
-        return schedule.day_of_week.includes(currentDay);
-      }
-      
-      return true;
-    } else if (schedule.type === 'SEASONAL') {
-      // Check if current date is within seasonal range
-      return isDateInRange(now, schedule.start_date, schedule.end_date);
+    if (scheduleTypeFilter && scheduleTypeFilter !== 'ALL') {
+      sql += ` AND type = ?`;
+      params.push(scheduleTypeFilter);
     }
-    
-    return false;
-  });
 
-  if (activeSchedules.length === 0) {
-    return success(res, [], SuccessMessage.MENU_RETRIEVED);
+    const schedules = await query<MenuSchedule>(sql, params);
+
+    if (!schedules || schedules.length === 0) {
+      return success(res, [], SuccessMessage.MENU_RETRIEVED);
+    }
+
+    // Filter schedules based on current time/date
+    const activeSchedules = schedules.filter((schedule: any) => {
+      if (schedule.type === 'TIME_SLOT') {
+        // Check if current time is within the time slot
+        if (!isTimeInRange(currentTime, schedule.start_time, schedule.end_time)) {
+          return false;
+        }
+
+        // Check day of week if specified
+        if (schedule.day_of_week) {
+          const dayOfWeek = JSON.parse(schedule.day_of_week);
+          const currentDay = now.getDay();
+          if (dayOfWeek.length > 0 && !dayOfWeek.includes(currentDay)) {
+            return false;
+          }
+        }
+
+        return true;
+      } else if (schedule.type === 'SEASONAL') {
+        // Check if current date is within seasonal range
+        const currentDateStr = now.toISOString().split('T')[0];
+        return (
+          currentDateStr >= schedule.start_date &&
+          currentDateStr <= schedule.end_date
+        );
+      }
+
+      return false;
+    });
+
+    if (activeSchedules.length === 0) {
+      return success(res, [], SuccessMessage.MENU_RETRIEVED);
+    }
+
+    // Get menu items from active schedules
+    const activeScheduleIds = activeSchedules.map((s: any) => s.id);
+
+    const menuItems = await query<any>(
+      `SELECT 
+        msi.*,
+        m.id as menu_item_id,
+        m.name as menu_item_name,
+        m.price as menu_item_price,
+        m.category as menu_item_category,
+        m.description as menu_item_description
+       FROM menu_schedule_items msi
+       JOIN menu m ON msi.menu_item_id = m.id
+       WHERE msi.schedule_id IN (${activeScheduleIds.map(() => '?').join(',')})
+         AND m.is_active = true
+       ORDER BY msi.priority ASC, msi.created_at ASC`,
+      activeScheduleIds
+    );
+
+    // Group items by schedule for clarity
+    const result = activeSchedules.map((schedule: any) => {
+      const scheduleItems = menuItems.filter(
+        (item: any) => item.schedule_id === schedule.id
+      );
+
+      return {
+        schedule: {
+          id: schedule.id,
+          name: schedule.name,
+          type: schedule.type,
+          timezone: schedule.timezone,
+        },
+        items: scheduleItems,
+        itemCount: scheduleItems.length,
+      };
+    });
+
+    return success(res, {
+      current_time: currentTime,
+      current_date: now.toISOString().split('T')[0],
+      active_schedules: result.length,
+      schedules: result,
+    }, SuccessMessage.MENU_RETRIEVED);
+  } catch (err) {
+    console.error('Get time-based menu error:', err);
+    return error(res, ErrorMessage.SERVER_ERROR, 500);
   }
-
-  // Get menu items from active schedules
-  const activeScheduleIds = activeSchedules.map((s) => s.id);
-  
-  const { data: menuItems, error: menuErr } = await supabase
-    .from('menu_schedule_items')
-    .select(`
-      *,
-      menu_items:menu_item_id (
-        id,
-        name,
-        price,
-        category,
-        is_active,
-        description
-      ),
-      schedules:schedule_id (
-        id,
-        name,
-        type,
-        timezone
-      )
-    `)
-    .in('schedule_id', activeScheduleIds)
-    .eq('menu_items.is_active', true)
-    .order('priority', { ascending: true })
-    .order('created_at', { ascending: true });
-
-  if (menuErr) {
-    return error(res, menuErr.message, 400);
-  }
-
-  // Group items by schedule for clarity
-  const result = activeSchedules.map((schedule) => {
-    const scheduleItems = menuItems?.filter(
-      (item) => item.schedule_id === schedule.id
-    ) || [];
-    
-    return {
-      schedule: {
-        id: schedule.id,
-        name: schedule.name,
-        type: schedule.type,
-        timezone: schedule.timezone,
-      },
-      items: scheduleItems,
-      itemCount: scheduleItems.length,
-    };
-  });
-
-  return success(res, {
-    current_time: currentTime,
-    current_date: now.toISOString().split('T')[0],
-    timezone: branchTimezone,
-    active_schedules: result.length,
-    schedules: result,
-  }, SuccessMessage.MENU_RETRIEVED);
 };
 
 /**
@@ -504,46 +602,53 @@ export const getAvailableTimeSlots = async (
   req: Request,
   res: Response
 ): Promise<Response> => {
-  const dateParam = parseQueryDate(req.query.date as string);
-  const targetDate = dateParam || new Date();
-  const targetDay = getDayOfWeek(targetDate);
+  const dateParam = req.query.date as string;
+  const targetDate = dateParam ? new Date(dateParam) : new Date();
+  const targetDay = targetDate.getDay();
 
   if (!req.user?.hq_id) {
     return error(res, ErrorMessage.HQ_NOT_ASSIGNED, 403);
   }
 
-  const { data: schedules, error: err } = await supabase
-    .from('menu_schedules')
-    .select('*')
-    .eq('hq_id', req.user.hq_id)
-    .eq('type', 'TIME_SLOT')
-    .eq('is_active', true);
+  try {
+    const schedules = await query<MenuSchedule>(
+      `SELECT * FROM menu_schedules 
+       WHERE hq_id = ? AND type = 'TIME_SLOT' AND is_active = true`,
+      [req.user.hq_id]
+    );
 
-  if (err) {
-    return error(res, err.message, 400);
+    // Filter schedules that include the target day
+    const availableSlots = schedules
+      .filter((schedule: any) => {
+        if (!schedule.day_of_week) {
+          return true;
+        }
+        const dayOfWeek = JSON.parse(schedule.day_of_week);
+        return dayOfWeek.length === 0 || dayOfWeek.includes(targetDay);
+      })
+      .map((schedule: any) => ({
+        schedule_id: schedule.id,
+        schedule_name: schedule.name,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        timezone: schedule.timezone,
+      }))
+      .sort((a: any, b: any) => a.start_time.localeCompare(b.start_time));
+
+    return success(res, {
+      date: targetDate.toISOString().split('T')[0],
+      day_name: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][targetDay],
+      available_slots: availableSlots,
+    }, SuccessMessage.SCHEDULE_RETRIEVED);
+  } catch (err) {
+    console.error('Get available time slots error:', err);
+    return error(res, ErrorMessage.SERVER_ERROR, 500);
   }
-
-  // Filter schedules that include the target day
-  const availableSlots = schedules
-    .filter((schedule) => {
-      if (!schedule.day_of_week || schedule.day_of_week.length === 0) {
-        return true;
-      }
-      return schedule.day_of_week.includes(targetDay);
-    })
-    .map((schedule) => ({
-      schedule_id: schedule.id,
-      schedule_name: schedule.name,
-      start_time: schedule.start_time,
-      end_time: schedule.end_time,
-      timezone: schedule.timezone,
-    }))
-    .sort((a, b) => a.start_time.localeCompare(b.start_time));
-
-  return success(res, {
-    date: targetDate.toISOString().split('T')[0],
-    day_name: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][targetDay],
-    available_slots: availableSlots,
-  }, SuccessMessage.SCHEDULE_RETRIEVED);
 };
+
+// Helper function to check if time is in range
+function isTimeInRange(current: string, start: string | null, end: string | null): boolean {
+  if (!start || !end) return false;
+  return current >= start && current <= end;
+}
 

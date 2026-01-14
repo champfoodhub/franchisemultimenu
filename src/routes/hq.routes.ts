@@ -1,7 +1,4 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middlewares/auth.middleware';
-import { allowRoles } from '../middlewares/role.middleware';
-import { validate } from '../middlewares/validate';
 import {
   getProducts,
   getBranches,
@@ -11,25 +8,33 @@ import {
   deleteProduct,
   stockReport,
 } from '../controllers/hq.controller';
-import { createProductSchema, updateProductSchema } from '../validators/schemas';
+import { authMiddleware, requireHQ } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate';
+import {
+  createProductSchema,
+  updateProductSchema,
+} from '../validators/schemas';
 
-const router: Router = Router();
+const router = Router();
 
+// All routes require authentication and HQ role
 router.use(authMiddleware);
-router.use(allowRoles('HQ'));
+router.use(requireHQ);
 
-// Product routes
+// HQ Routes
+
+// Product Routes (HQ only)
 router.get('/products', getProducts);
 router.post('/products', validate(createProductSchema), createProduct);
-router.patch('/products/:id', validate(updateProductSchema), updateProduct);
+router.put('/products/:id', validate(updateProductSchema), updateProduct);
 router.delete('/products/:id', deleteProduct);
 
-// Branch routes
+// Branch Routes (HQ only)
 router.get('/branches', getBranches);
 
-// Stock routes
+// Stock Routes (HQ only)
 router.get('/stock', getStock);
-router.get('/stock-report', stockReport);
+router.get('/stock/report', stockReport);
 
 export default router;
 

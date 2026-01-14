@@ -12,6 +12,12 @@ export const ErrorMessage = {
   TOKEN_MISSING: 'Token missing',
   INVALID_TOKEN: 'Invalid token',
   AUTHENTICATION_FAILED: 'Authentication failed',
+  INVALID_CREDENTIALS: 'Invalid email or password',
+
+  // User errors
+  USER_NOT_FOUND: 'User not found',
+  USER_CREATION_FAILED: 'Failed to create user',
+  USER_UPDATE_FAILED: 'Failed to update user',
 
   // Authorization errors
   FORBIDDEN: 'Forbidden',
@@ -39,6 +45,7 @@ export const ErrorMessage = {
   NOT_FOUND: 'Not found',
   UNAUTHORIZED: 'Unauthorized',
   CONFLICT: 'Conflict',
+  SERVER_ERROR: 'Server error',
 
   // Menu Schedule errors
   SCHEDULE_NOT_FOUND: 'Schedule not found',
@@ -64,6 +71,7 @@ export const SuccessMessage = {
   LOGIN_SUCCESSFUL: 'Login successful',
   LOGOUT_SUCCESSFUL: 'Logout successful',
   TOKEN_REFRESHED: 'Token refreshed',
+  USER_RETRIEVED: 'User retrieved',
 
   // CRUD success
   CREATED: 'Created',

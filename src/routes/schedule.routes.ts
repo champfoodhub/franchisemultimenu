@@ -1,7 +1,4 @@
-import { Router, RequestHandler } from 'express';
-import { authMiddleware } from '../middlewares/auth.middleware';
-import { allowRoles } from '../middlewares/role.middleware';
-import { validate } from '../middlewares/validate';
+import { Router } from 'express';
 import {
   createSchedule,
   getSchedules,
@@ -14,82 +11,36 @@ import {
   getTimeBasedMenu,
   getAvailableTimeSlots,
 } from '../controllers/schedule.controller';
+import { authMiddleware, requireHQ, requireBranch } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate';
 import {
   createScheduleSchema,
   updateScheduleSchema,
   addScheduleItemsSchema,
-  branchMenuQuerySchema,
-  getScheduleItemsSchema,
-  removeScheduleItemSchema,
 } from '../validators/schedule.schemas';
 
 const router = Router();
 
-// ============================================
-// HQ Admin Routes
-// ============================================
+// Schedule routes for HQ
+router.use(authMiddleware);
 
-// Apply HQ admin authentication to all routes
-router.use(authMiddleware as RequestHandler);
-router.use(allowRoles('HQ') as RequestHandler);
+// HQ-only schedule routes
+router.post('/schedules', requireHQ, validate(createScheduleSchema), createSchedule);
+router.get('/schedules', requireHQ, getSchedules);
+router.get('/schedules/:id', requireHQ, getScheduleById);
+router.put('/schedules/:id', requireHQ, validate(updateScheduleSchema), updateSchedule);
+router.delete('/schedules/:id', requireHQ, deleteSchedule);
 
-// Schedule CRUD operations
-router.post(
-  '/schedules',
-  validate(createScheduleSchema) as RequestHandler,
-  createSchedule
-);
+// Schedule items routes (HQ only)
+router.post('/schedules/:schedule_id/items', requireHQ, validate(addScheduleItemsSchema), addScheduleItems);
+router.get('/schedules/:schedule_id/items', requireHQ, getScheduleItems);
+router.delete('/schedules/items/:item_id', requireHQ, removeScheduleItem);
 
-router.get(
-  '/schedules',
-  getSchedules
-);
+// Time-based menu (HQ or Branch)
+router.get('/time-based-menu', getTimeBasedMenu);
 
-router.get(
-  '/schedules/:id',
-  getScheduleById
-);
-
-router.put(
-  '/schedules/:id',
-  validate(updateScheduleSchema) as RequestHandler,
-  updateSchedule
-);
-
-router.delete(
-  '/schedules/:id',
-  deleteSchedule
-);
-
-// Schedule Items management
-router.get(
-  '/schedules/:schedule_id/items',
-  validate(getScheduleItemsSchema) as RequestHandler,
-  getScheduleItems
-);
-
-router.post(
-  '/schedule-items',
-  validate(addScheduleItemsSchema) as RequestHandler,
-  addScheduleItems
-);
-
-router.delete(
-  '/schedule-items/:item_id',
-  validate(removeScheduleItemSchema) as RequestHandler,
-  removeScheduleItem
-);
-
-// Available time slots for a date
-router.get(
-  '/time-slots',
-  getAvailableTimeSlots
-);
-
-// ============================================
-// Branch Routes (separate router mounted in app.ts)
-// Note: Branch routes have different middleware configuration
-// ============================================
+// Available time slots (HQ only)
+router.get('/time-slots', requireHQ, getAvailableTimeSlots);
 
 export default router;
 

@@ -11,22 +11,33 @@ import hqRoutes from './routes/hq.routes';
 import branchRoutes from './routes/branch.routes';
 import scheduleRoutes from './routes/schedule.routes';
 
+// Import MySQL config for initialization
+import mysqlConfig from './config/mysql';
+
 const app: Application = express();
 
 // Middleware
 app.use(express.json());
 
+// Initialize database connection
+mysqlConfig.testConnection().catch((err) => {
+  console.error('Failed to connect to MySQL:', err);
+  process.exit(1);
+});
+
 // Routes
 app.use('/auth', authRoutes);
 app.use('/hq', hqRoutes);
 app.use('/branch', branchRoutes);
-app.use('/hq', scheduleRoutes); // Schedule management under HQ admin
+app.use('/menu', menuRoutes);
+app.use('/schedules', scheduleRoutes);
 
 // Health check
 app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'OK',
-    service: 'FoodHub Backend',
+    service: 'Franchise Menu Management',
+    database: 'MySQL',
   });
 });
 
