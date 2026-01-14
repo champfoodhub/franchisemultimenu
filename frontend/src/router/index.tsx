@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import App from '../App';
+import Layout from '../components/Layout';
 import Login from '../pages/Login';
 import Home from '../pages/Home';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -27,54 +28,59 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           {
-            path: '',
-            element: <Home />,
-          },
-          {
-            element: <RoleProtectedRoute roles={['HQ']} />,
+            element: <Layout />,
             children: [
               {
-                path: 'hq',
-                element: <HQDashboard />,
+                path: '',
+                element: <Home />,
+              },
+              {
+                element: <RoleProtectedRoute roles={['HQ']} />,
                 children: [
                   {
-                    path: 'products',
-                    element: <Products />,
-                  },
-                  {
-                    path: 'schedules',
-                    element: <Schedules />,
-                  },
-                  {
-                    path: 'schedules/:id',
-                    element: <ScheduleItems />,
-                  },
-                  {
-                    path: 'stock-reports',
-                    element: <StockReports />,
+                    path: 'hq',
+                    element: <HQDashboard />,
+                    children: [
+                      {
+                        path: 'products',
+                        element: <Products />,
+                      },
+                      {
+                        path: 'schedules',
+                        element: <Schedules />,
+                      },
+                      {
+                        path: 'schedules/:id',
+                        element: <ScheduleItems />,
+                      },
+                      {
+                        path: 'stock-reports',
+                        element: <StockReports />,
+                      },
+                    ],
                   },
                 ],
               },
-            ],
-          },
-          {
-            element: <RoleProtectedRoute roles={['BRANCH']} />,
-            children: [
               {
-                path: 'branch',
-                element: <BranchDashboard />,
+                element: <RoleProtectedRoute roles={['BRANCH']} />,
                 children: [
                   {
-                    path: 'menu',
-                    element: <Menu />,
-                  },
-                  {
-                    path: 'time-based-menu',
-                    element: <TimeBasedMenu />,
-                  },
-                  {
-                    path: 'stock-update',
-                    element: <StockUpdate />,
+                    path: 'branch',
+                    element: <BranchDashboard />,
+                    children: [
+                      {
+                        path: 'menu',
+                        element: <Menu />,
+                      },
+                      {
+                        path: 'time-based-menu',
+                        element: <TimeBasedMenu />,
+                      },
+                      {
+                        path: 'stock-update',
+                        element: <StockUpdate />,
+                      },
+                    ],
                   },
                 ],
               },

@@ -8,6 +8,7 @@ export interface Product {
   id: number;
   name: string;
   price: number;
+  category?: string;
 }
 
 export interface Schedule {
@@ -36,6 +37,7 @@ export interface Stock {
   product_id: number;
   branch_id: number;
   quantity: number;
+  discount?: number;
 }
 
 export interface MenuItem {
@@ -44,4 +46,8 @@ export interface MenuItem {
   branch_id: number;
   price: number;
   active: boolean;
+  stock?: number;
+  discount?: number;
+  category?: string;
+  product_name?: string;
 }
