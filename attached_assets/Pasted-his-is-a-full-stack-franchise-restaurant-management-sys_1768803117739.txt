@@ -1,0 +1,253 @@
+his is a full-stack franchise restaurant management system that allows a central Headquarters (HQ) to manage menus across multiple branch locations. It features time-based and seasonal menus, role-based access control, and comprehensive inventory management.
+
+1. Architecture & Tech Stack
+Backend (Node.js + Express + TypeScript)
+Runtime: Node.js 18+
+Framework: Express.js
+Language: TypeScript
+Database: MySQL 8.0 (using mysql2/promise driver)
+Authentication: JWT (jsonwebtoken) with bcryptjs password hashing
+Validation: Zod schema validation
+Testing: Jest with ts-jest
+Frontend (React + Vite - not present in repo but referenced)
+React with TypeScript
+Vite as build tool
+Tailwind CSS for styling
+2. Role-Based Access Control (RBAC)
+Three User Roles:
+| Role | Description | Capabilities |
+|------|-------------|--------------|
+| HQ_ADMIN | Central headquarters administrator | Create products, manage all branches, create schedules, view stock reports |
+| BRANCH_MANAGER | Individual branch manager | Update stock, apply discounts, view branch menu, update branch-specific menu items |
+| ADMIN | System superadmin | Full access to all features |
+
+Authentication Flow:
+Login → Returns JWT access token (7 days) + refresh token (30 days)
+Token Structure includes: id, email, role, hq_id, branch_id
+Middleware Protection:
+authMiddleware: Verifies JWT token
+requireHQ: HQ-only routes
+requireBranch: Branch-only routes
+allowRoles: Role-based permission checking
+Route Protection:
+
+/auth/*           → Public (login endpoints)
+/hq/*            → HQ_ADMIN only
+/branch/*        → BRANCH_MANAGER only
+/schedules/*     → Mixed (HQ creates, both can view time-based menu)
+/menu/*          → Mixed access
+3. Time-Based Menu System
+Schedule Types:
+A. TIME_SLOT Schedules
+For different times of day (e.g., breakfast, lunch, dinner):
+
+
+-- Example: Breakfast 6 AM - 11 AM, Monday-Friday
+type: 'TIME_SLOT'
+start_time: '06:00:00'
+end_time: '11:00:00'
+day_of_week: [1, 2, 3, 4, 5]  -- JSON array
+timezone: 'America/New_York'
+B. SEASONAL Schedules
+For holidays, promotions, limited-time offers:
+
+
+-- Example: Christmas Special
+type: 'SEASONAL'
+start_date: '2024-12-20'
+end_date: '2024-12-26'
+name: 'Christmas Special Menu'
+Time-Based Menu Features:
+Automatic menu switching based on current time
+Day-of-week filtering
+Multiple timezone support
+Featured items with priority ordering
+Schedule items linked to menu items
+Endpoints:
+
+POST   /schedules                    - Create schedule (HQ)
+GET    /schedules                    - List all schedules
+GET    /schedules/:id                - Get single schedule
+PUT    /schedules/:id                - Update schedule
+DELETE /schedules/:id                - Delete schedule
+POST   /schedules/:id/items          - Add items to schedule
+GET    /schedules/:id/items          - Get schedule items
+DELETE /schedules/items/:item_id     - Remove item from schedule
+GET    /schedules/time-based-menu    - Get active menu based on time
+GET    /schedules/time-slots         - Get available time slots for date
+4. Database Schema (MySQL)
+Core Tables:
+Users Table
+
+users (
+  id, email, password_hash, role (HQ/BRANCH/ADMIN),
+  hq_id, branch_id, full_name, is_active,
+  created_at, updated_at
+)
+Branches Table
+
+branches (
+  id, hq_id, name, timezone, address, is_active,
+  created_at, updated_at
+)
+Products Table (HQ-level catalog)
+
+products (
+  id, hq_id, name, description, base_price,
+  category, image_url, is_active,
+  created_at, updated_at
+)
+Branch Products Table (Branch-specific data)
+
+branch_products (
+  id, branch_id, product_id, stock, discount,
+  is_available, created_at, updated_at
+)
+Menu Table (Menu items)
+
+menu (
+  id, product_id, branch_id, name, price,
+  description, category, image_url, is_active,
+  created_at, updated_at
+)
+Branch Menu Table (Branch-specific menu)
+
+branch_menu (
+  id, menu_id, branch_id, stock, discount_percent,
+  is_available, created_at, updated_at
+)
+Menu Schedules Table
+
+menu_schedules (
+  id, hq_id, name,
+  type (TIME_SLOT/SEASONAL),
+  -- For TIME_SLOT:
+  start_time, end_time,
+  -- For SEASONAL:
+  start_date, end_date,
+  -- Common:
+  timezone, day_of_week (JSON), is_active,
+  created_at, updated_at
+)
+Schedule Items Table
+
+menu_schedule_items (
+  id, schedule_id, menu_item_id,
+  priority, is_featured, created_at
+)
+5. Stored Procedures
+get_branch_menu
+Returns all menu items for a specific branch with stock and discount info.
+
+get_time_based_menu
+Returns menu items active for the current time/date:
+
+Checks TIME_SLOT schedules (within time range + day of week)
+Checks SEASONAL schedules (within date range)
+Returns items ordered by priority
+get_available_time_slots
+Returns all time slots available for a specific date.
+
+get_hq_stock_report
+Returns stock levels across all branches for HQ review.
+
+6. Branch Guest Features
+Branch Manager Capabilities:
+Stock Management
+
+Update stock levels for products
+View current inventory
+Discount Management
+
+Apply discounts (0-30% max)
+Branch-specific pricing
+Menu Access
+
+View full branch menu
+Update branch-specific menu configurations
+See time-based menu for current time
+Reports
+
+View branch-specific stock reports
+Branch Guest Experience:
+Dynamic menu based on time of day
+Seasonal specials automatically displayed
+Consistent pricing within brand standards
+Real-time availability updates
+7. Key Features Summary
+| Feature | Description |
+|---------|-------------|
+| Centralized Menu Management | HQ controls all products and base pricing |
+| Multi-Branch Support | Unlimited branches under single HQ |
+| Time-Based Menus | Automatic breakfast/lunch/dinner切换 |
+| Seasonal Menus | Holiday and promotion support |
+| Stock Tracking | Per-branch inventory management |
+| Discount Control | Branch-level discounts with HQ limits |
+| JWT Authentication | Secure, stateless auth with refresh tokens |
+| Input Validation | Zod schemas for all inputs |
+| MySQL Database | Relational data with stored procedures |
+| Multi-Timezone | Branch-specific timezone handling |
+
+8. API Endpoints Summary
+Authentication
+
+POST /auth/login          - Login with email/password
+POST /auth/login/hq       - Quick HQ login (dev)
+POST /auth/login/branch   - Quick Branch login (dev)
+GET  /auth/user           - Get current user
+POST /auth/logout         - Logout
+HQ Management
+
+GET  /hq/products         - List all products
+POST /hq/products         - Create product
+PUT  /hq/products/:id     - Update product
+DELETE /hq/products/:id   - Disable product
+GET  /hq/branches         - List branches
+GET  /hq/stock            - Get all stock records
+GET  /hq/stock/report     - Stock report
+Branch Management
+
+GET  /branch/branch       - Get branch info
+GET  /branch/products     - Get branch products
+PUT  /branch/stock/:id    - Update stock
+PUT  /branch/discount/:id - Update discount
+GET  /branch/menu         - Get branch menu
+PUT  /branch/menu/:id     - Update branch menu item
+Schedule Management
+
+POST /schedules/schedules              - Create schedule
+GET  /schedules/schedules              - List schedules
+GET  /schedules/schedules/:id          - Get schedule
+PUT  /schedules/schedules/:id          - Update schedule
+DELETE /schedules/schedules/:id        - Delete schedule
+POST /schedules/schedules/:id/items    - Add items
+GET  /schedules/schedules/:id/items    - Get items
+DELETE /schedules/schedules/items/:id  - Remove item
+GET  /schedules/time-based-menu        - Get menu by time
+GET  /schedules/time-slots             - Get time slots
+9. Data Flow Example
+Creating a Breakfast Menu:
+HQ Admin logs in → JWT token issued
+Create TIME_SLOT schedule: "Breakfast", 06:00-11:00, [1-5]
+Add menu items to schedule
+Branch queries /schedules/time-based-menu
+System returns breakfast items (6-11 AM on weekdays)
+Seasonal Menu Flow:
+HQ creates SEASONAL schedule: "Winter Special"
+Set start_date: 2024-12-01, end_date: 2025-01-15
+Add special menu items
+Branches automatically show Winter Special within dates
+10. Security & Validation
+Password Security:
+bcryptjs with 10 salt rounds
+Minimum 6 character password
+Input Validation (Zod):
+Email format validation
+Price range validation (positive numbers)
+Discount limits (0-30%)
+Stock non-negative integers
+Category length limits
+Error Handling:
+Standardized error responses
+Centralized error messages
+401 (Unauthorized), 403 (Forbidden), 404 (Not Found), 500 (Server Error)
