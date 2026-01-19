@@ -240,7 +240,9 @@ export class DatabaseStorage implements IStorage {
     
     const activeScheduleIds = allSchedules.filter(s => {
       if (s.type === 'SEASONAL') {
-        return s.startDate && s.endDate && date >= s.startDate && date <= s.endDate;
+        // Compare as ISO date strings
+        const todayStr = date.toISOString().split('T')[0];
+        return s.startDate && s.endDate && todayStr >= s.startDate && todayStr <= s.endDate;
       } else if (s.type === 'TIME_SLOT') {
         const days = parseJsonField<number[] | null>(s.daysOfWeek, null);
         if (!days || !days.includes(dayOfWeek)) return false;
