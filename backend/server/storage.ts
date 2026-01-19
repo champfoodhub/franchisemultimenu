@@ -66,19 +66,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
+    // Safely convert Date to ISO string if needed
+    let createdAtValue: string | undefined = undefined;
+    if (user.createdAt !== undefined) {
+      createdAtValue = user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt;
+    }
+    
     const result = await db.insert(users).values({
       username: user.username,
       password: user.password,
       role: user.role ?? "BRANCH_MANAGER",
       name: user.name,
       branchId: user.branchId ?? undefined,
-      createdAt: user.createdAt ?? undefined,
+      createdAt: createdAtValue,
     }).returning();
     return result[0];
   }
 
   async getProducts(): Promise<Product[]> {
-    return await db.select().from(products).where(eq(products.isActive, true));
+    return await db.select().from(products).where(eq(products.isActive, 1));
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
@@ -87,14 +93,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createProduct(product: InsertProduct): Promise<Product> {
+    // Safely serialize menu field to ensure it's a string or null
+    let menuValue: string | null = null;
+    if (product.menu !== undefined && product.menu !== null) {
+      menuValue = typeof product.menu === 'string' ? product.menu : JSON.stringify(product.menu);
+    }
+    
     const result = await db.insert(products).values({
       name: product.name,
       description: product.description,
       basePrice: String(product.basePrice),
       category: product.category,
-      menu: product.menu ?? null,
+      menu: menuValue,
       imageUrl: product.imageUrl,
-      isActive: true,
+      isActive: 1,
     }).returning();
     return result[0];
   }
@@ -105,16 +117,20 @@ export class DatabaseStorage implements IStorage {
     if (update.description !== undefined) updateValues.description = update.description;
     if (update.basePrice !== undefined) updateValues.basePrice = String(update.basePrice);
     if (update.category !== undefined) updateValues.category = update.category;
-    if (update.menu !== undefined) updateValues.menu = update.menu;
     if (update.imageUrl !== undefined) updateValues.imageUrl = update.imageUrl;
     if (update.isActive !== undefined) updateValues.isActive = update.isActive;
+    
+    // Safely serialize menu field to ensure it's a string or null
+    if (update.menu !== undefined) {
+      updateValues.menu = typeof update.menu === 'string' ? update.menu : JSON.stringify(update.menu);
+    }
     
     const result = await db.update(products).set(updateValues).where(eq(products.id, id)).returning();
     return result[0];
   }
 
   async getBranches(): Promise<Branch[]> {
-    return await db.select().from(branches).where(eq(branches.isActive, true));
+    return await db.select().from(branches).where(eq(branches.isActive, 1));
   }
 
   async getBranch(id: number): Promise<Branch | undefined> {
@@ -127,7 +143,7 @@ export class DatabaseStorage implements IStorage {
       name: branch.name,
       address: branch.address,
       timezone: branch.timezone ?? "UTC",
-      isActive: true,
+      isActive: 1,
     }).returning();
     return result[0];
   }
@@ -156,7 +172,7 @@ export class DatabaseStorage implements IStorage {
     const updateValues: Partial<Inventory> = {};
     if (update.stock !== undefined) updateValues.stock = update.stock;
     if (update.discount !== undefined) updateValues.discount = update.discount;
-    if (update.isAvailable !== undefined) updateValues.isAvailable = update.isAvailable;
+    if (update.isAvailable !== undefined) updateValues.isAvailable = update.isAvailable ? 1 : 0;
     
     const result = await db.update(inventory).set(updateValues).where(eq(inventory.id, id)).returning();
     return result[0];
@@ -168,13 +184,13 @@ export class DatabaseStorage implements IStorage {
       productId: item.productId,
       stock: item.stock ?? 0,
       discount: item.discount ?? 0,
-      isAvailable: item.isAvailable ?? true,
+      isAvailable: item.isAvailable !== undefined ? (item.isAvailable ? 1 : 0) : 1,
     }).returning();
     return result[0];
   }
 
   async getSchedules(): Promise<Schedule[]> {
-    return await db.select().from(schedules).where(eq(schedules.isActive, true));
+    return await db.select().from(schedules).where(eq(schedules.isActive, 1));
   }
 
   async createSchedule(schedule: InsertSchedule): Promise<Schedule> {
@@ -190,7 +206,7 @@ export class DatabaseStorage implements IStorage {
       daysOfWeek: daysOfWeekValue,
       startDate: schedule.startDate,
       endDate: schedule.endDate,
-      isActive: true,
+      isActive: 1,
     }).returning();
     return result[0];
   }
@@ -240,7 +256,9 @@ export class DatabaseStorage implements IStorage {
     
     const activeScheduleIds = allSchedules.filter(s => {
       if (s.type === 'SEASONAL') {
-        return s.startDate && s.endDate && date >= s.startDate && date <= s.endDate;
+        // Compare as ISO date strings
+        const todayStr = date.toISOString().split('T')[0];
+        return s.startDate && s.endDate && todayStr >= s.startDate && todayStr <= s.endDate;
       } else if (s.type === 'TIME_SLOT') {
         const days = parseJsonField<number[] | null>(s.daysOfWeek, null);
         if (!days || !days.includes(dayOfWeek)) return false;
@@ -252,7 +270,11 @@ export class DatabaseStorage implements IStorage {
       return false;
     }).map(s => s.id);
 
-    if (activeScheduleIds.length === 0) return [];
+    if (activeScheduleIds.length === 0) {
+      // Fallback: Return all active products if no schedules are active
+      const allProducts = await this.getProducts();
+      return allProducts;
+    }
 
     const items: Product[] = [];
     for (const sid of activeScheduleIds) {
