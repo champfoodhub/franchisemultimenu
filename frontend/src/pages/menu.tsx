@@ -1,10 +1,11 @@
 import { useActiveMenu } from "@/hooks/use-foodhub";
 import { Card, Button, Badge } from "@/components/ui-custom";
+import { MenuCard } from "@/components/MenuCard";
 import { Link } from "wouter";
-import { ShoppingBag, Star } from "lucide-react";
+import { ShoppingBag, Star, AlertCircle } from "lucide-react";
 
 export default function PublicMenu() {
-  const { data: products, isLoading } = useActiveMenu();
+  const { data: products, isLoading, error } = useActiveMenu();
   
   const now = new Date();
   const hours = now.getHours();
@@ -55,11 +56,26 @@ export default function PublicMenu() {
             </div>
           </div>
 
+          {/* Error State */}
+          {error && (
+            <div className="text-center py-12">
+              <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Unable to load menu. Please try again later.</p>
+            </div>
+          )}
+
+          {/* Loading State */}
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[1,2,3].map(i => <div key={i} className="h-80 bg-muted/20 animate-pulse rounded-2xl" />)}
             </div>
+          ) : !error && (!products || products.length === 0) ? (
+            /* Empty State */
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No menu items available at this time.</p>
+            </div>
           ) : (
+            /* Products Grid */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {products?.map(product => (
                 <MenuCard key={product.id} product={product} />
@@ -67,33 +83,6 @@ export default function PublicMenu() {
             </div>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function MenuCard({ product }: { product: any }) {
-  return (
-    <div className="group relative bg-white rounded-2xl overflow-hidden hover:shadow-xl transition-all duration-300 border border-border/50">
-      <div className="aspect-[4/3] overflow-hidden relative">
-        <img 
-          src={product.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80"} 
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-        />
-        <div className="absolute top-3 left-3">
-          <Badge className="bg-white/90 text-foreground shadow-sm backdrop-blur-md">{product.category}</Badge>
-        </div>
-      </div>
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-xl font-bold font-display group-hover:text-primary transition-colors">{product.name}</h3>
-          <span className="text-lg font-bold text-primary">${product.basePrice}</span>
-        </div>
-        <p className="text-muted-foreground text-sm line-clamp-2 mb-6">{product.description}</p>
-        <Button className="w-full font-bold group-hover:bg-primary group-hover:text-white transition-colors">
-          Add to Order <ShoppingBag className="w-4 h-4 ml-2" />
-        </Button>
       </div>
     </div>
   );

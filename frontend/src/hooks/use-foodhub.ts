@@ -196,16 +196,29 @@ export function useUpdateSchedule() {
 // === PUBLIC MENU ===
 export function useActiveMenu(branchId?: number) {
   return useQuery({
-    queryKey: [api.schedules.active.path, branchId],
+    queryKey: [api.schedules.active.path, branchId].filter(Boolean),
     queryFn: async () => {
       let url = api.schedules.active.path;
       if (branchId) {
         url += `?branchId=${branchId}`;
       }
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch menu");
-      return api.schedules.active.responses[200].parse(await res.json());
+      if (!res.ok) {
+        // Return empty array instead of throwing to prevent blank screen
+        return [];
+      }
+      try {
+        const data = await res.json();
+        // Validate the response data
+        return api.schedules.active.responses[200].parse(data);
+      } catch (e) {
+        console.warn('Failed to parse menu response, returning empty array');
+        // Return empty array if parsing fails
+        return [];
+      }
     },
+    retry: 1,
+    retryDelay: 1000,
   });
 }
 
